@@ -515,11 +515,21 @@ impl View {
     ) -> Option<usize> {
         let inner = self.inner_area(doc);
         // 1 for status
+        log::info!(
+            "t: {} b: {} r: {} l: {} row: {}, col: {}",
+            inner.top(),
+            inner.bottom(),
+            inner.right(),
+            inner.left(),
+            row,
+            column,
+        );
         if row < inner.top() || row >= inner.bottom() {
             return None;
         }
 
-        if column < inner.left() || column > inner.right() {
+        // 1 for border
+        if column < inner.left() || column >= inner.right() {
             return None;
         }
 
@@ -605,11 +615,12 @@ impl View {
     /// Returns None if coordinates are not on the gutter.
     pub fn gutter_coords_at_screen_coords(&self, row: u16, column: u16) -> Option<Position> {
         // 1 for status
-        if row < self.area.top() || row >= self.area.bottom() {
+        if row < self.area.top() || row >= self.area.bottom() - 1 {
             return None;
         }
 
-        if column < self.area.left() || column > self.area.right() {
+        // 1 for border
+        if column < self.area.left() || column >= self.area.right() {
             return None;
         }
 

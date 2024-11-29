@@ -1140,6 +1140,7 @@ impl EditorView {
                 let editor = &mut cxt.editor;
 
                 if let Some((pos, view_id)) = pos_and_view(editor, row, column, true) {
+                    log::info!("got pos and view");
                     let prev_view_id = view!(editor).id;
                     let doc = doc_mut!(editor, &view!(editor, view_id).doc);
 
@@ -1160,6 +1161,7 @@ impl EditorView {
                     }
 
                     if view_id != prev_view_id {
+                        log::info!("prev view not matched");
                         self.clear_completion(editor);
                     }
 
@@ -1170,6 +1172,7 @@ impl EditorView {
                 }
 
                 if let Some((coords, view_id)) = gutter_coords_and_view(editor, row, column) {
+                    log::info!("got gutter");
                     editor.focus(view_id);
 
                     let (view, doc) = current!(cxt.editor);
