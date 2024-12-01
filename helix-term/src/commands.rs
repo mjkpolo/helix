@@ -2424,7 +2424,10 @@ fn global_search(cx: &mut Context) {
         async move {
             let searcher = SearcherBuilder::new()
                 .heap_limit(
-                    config.file_picker_config.max_heap_usage.map(|m| max_heap_usage * 1024 * 1024)
+                    config
+                        .file_picker_config
+                        .heap_limit
+                        .map(|heap_limit| heap_limit * 1024 * 1024),
                 )
                 .binary_detection(BinaryDetection::quit(b'\x00'))
                 .build();
