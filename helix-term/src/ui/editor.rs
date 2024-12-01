@@ -1135,6 +1135,13 @@ impl EditorView {
             })
         };
 
+        let border_view = |editor: &Editor, row, column| {
+            editor.tree.views().find_map(|(view, _focus)| {
+                view.border_coords_at_screen_coords(row, column)
+                    .map(|_| view.id)
+            })
+        };
+
         match kind {
             MouseEventKind::Down(MouseButton::Left) => {
                 let editor = &mut cxt.editor;
@@ -1188,7 +1195,16 @@ impl EditorView {
                         let line = doc.text().char_to_line(char_idx);
                         commands::dap_toggle_breakpoint_impl(cxt, path, line);
                         return EventResult::Consumed(None);
+                    } else {
+                        return EventResult::Ignored(None);
                     }
+                }
+
+                if let Some(view_id) = border_view(editor, row, column) {
+                    log::info!("got border");
+                    editor.tree.get_mut_container(view_id).dothething(view_id);
+                    editor.tree.recalculate();
+                    return EventResult::Consumed(None);
                 }
 
                 EventResult::Ignored(None)

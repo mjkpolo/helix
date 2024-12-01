@@ -65,6 +65,7 @@ pub struct Container {
     layout: Layout,
     children: Vec<ViewId>,
     area: Rect,
+    bounds_deltas: Vec<i16>,
 }
 
 impl Container {
@@ -73,6 +74,14 @@ impl Container {
             layout,
             children: Vec::new(),
             area: Rect::default(),
+            bounds_deltas: Vec::new(),
+        }
+    }
+
+    pub fn dothething(&mut self, view_id: ViewId) {
+        if let Some(pos) = self.children.iter().position(|child| child == &view_id) {
+            self.bounds_deltas[pos] += 10;
+            log::info!("did the thing");
         }
     }
 }
@@ -132,6 +141,7 @@ impl Tree {
         };
 
         container.children.insert(pos, node);
+        container.bounds_deltas.insert(pos, 0i16);
         // focus the new node
         self.focus = node;
 
@@ -169,6 +179,7 @@ impl Tree {
                 pos + 1
             };
             container.children.insert(pos, node);
+            container.bounds_deltas.insert(pos, 0);
             self.nodes[node].parent = parent;
         } else {
             let mut split = Node::container(layout);
@@ -183,7 +194,9 @@ impl Tree {
                 _ => unreachable!(),
             };
             container.children.push(focus);
+            container.bounds_deltas.push(0);
             container.children.push(node);
+            container.bounds_deltas.push(0);
             self.nodes[focus].parent = split;
             self.nodes[node].parent = split;
 
@@ -241,9 +254,11 @@ impl Tree {
 
         if let Some(new) = replacement {
             container.children[pos] = new;
+            // container.bounds_deltas[pos] = 0;
             self.nodes[new].parent = parent;
         } else {
             container.children.remove(pos);
+            container.bounds_deltas.remove(pos);
         }
     }
 
@@ -328,6 +343,20 @@ impl Tree {
         }
     }
 
+    /// Get a mutable reference to a [Container] by index.
+    /// # Panics
+    ///
+    /// Panics if `index` is not in self.nodes, or if the node's content is not [Content::Container]. This can be checked with [Self::contains].
+    pub fn get_mut_container(&mut self, index: ViewId) -> &mut Container {
+        let parent = self.nodes[index].parent;
+        match &mut self.nodes[parent] {
+            Node {
+                content: Content::Container(container),
+                ..
+            } => container,
+            _ => unreachable!(),
+        }
+    }
     /// Check if tree contains a [Node] with a given index.
     pub fn contains(&self, index: ViewId) -> bool {
         self.nodes.contains_key(index)
@@ -388,13 +417,20 @@ impl Tree {
                             let mut child_y = area.y;
 
                             for (i, child) in container.children.iter().enumerate() {
+                                let bd = container.bounds_deltas[i];
+                                let child_height = if bd >= 0 {
+                                    height.saturating_add(bd as u16)
+                                } else {
+                                    height.saturating_sub((-bd) as u16)
+                                }
+                                .min(area.height - 2);
                                 let mut area = Rect::new(
                                     container.area.x,
                                     child_y,
                                     container.area.width,
-                                    height,
+                                    child_height,
                                 );
-                                child_y += height;
+                                child_y += child_height;
 
                                 // last child takes the remaining width because we can get uneven
                                 // space from rounding
@@ -418,13 +454,20 @@ impl Tree {
                             let mut child_x = area.x;
 
                             for (i, child) in container.children.iter().enumerate() {
+                                let bd = container.bounds_deltas[i];
+                                let child_width = if bd >= 0 {
+                                    width.saturating_add(bd as u16)
+                                } else {
+                                    width.saturating_sub((-bd) as u16)
+                                }
+                                .min(area.width - 2);
                                 let mut area = Rect::new(
                                     child_x,
                                     container.area.y,
-                                    width,
+                                    child_width,
                                     container.area.height,
                                 );
-                                child_x += width + inner_gap;
+                                child_x += child_width + inner_gap;
 
                                 // last child takes the remaining width because we can get uneven
                                 // space from rounding

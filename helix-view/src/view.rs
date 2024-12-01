@@ -630,6 +630,14 @@ impl View {
         ))
     }
 
+    // Only consider bottom or right side. Only needs to match for one view
+    pub fn border_coords_at_screen_coords(&self, row: u16, column: u16) -> Option<()> {
+        if row != self.area.bottom() - 1 && column != self.area.right() {
+            return None;
+        }
+        Some(())
+    }
+
     pub fn remove_document(&mut self, doc_id: &DocumentId) {
         self.jumps.remove(doc_id);
         self.docs_access_history.retain(|doc| doc != doc_id);
