@@ -1138,7 +1138,7 @@ impl EditorView {
         let border_view = |editor: &Editor, row, column| {
             editor.tree.views().find_map(|(view, _focus)| {
                 view.border_coords_at_screen_coords(row, column)
-                    .map(|_| view.id)
+                    .map(|is_bottom| (is_bottom, view.id))
             })
         };
 
@@ -1147,7 +1147,7 @@ impl EditorView {
                 let editor = &mut cxt.editor;
 
                 if let Some((pos, view_id)) = pos_and_view(editor, row, column, true) {
-                    log::info!("got pos and view");
+                    // log::info!("got pos and view");
                     let prev_view_id = view!(editor).id;
                     let doc = doc_mut!(editor, &view!(editor, view_id).doc);
 
@@ -1168,7 +1168,7 @@ impl EditorView {
                     }
 
                     if view_id != prev_view_id {
-                        log::info!("prev view not matched");
+                        // log::info!("prev view not matched");
                         self.clear_completion(editor);
                     }
 
@@ -1179,7 +1179,7 @@ impl EditorView {
                 }
 
                 if let Some((coords, view_id)) = gutter_coords_and_view(editor, row, column) {
-                    log::info!("got gutter");
+                    // log::info!("got gutter");
                     editor.focus(view_id);
 
                     let (view, doc) = current!(cxt.editor);
@@ -1200,11 +1200,23 @@ impl EditorView {
                     }
                 }
 
-                if let Some(view_id) = border_view(editor, row, column) {
-                    log::info!("got border");
-                    editor.tree.get_mut_container(view_id).dothething(view_id);
-                    editor.tree.recalculate();
+                if let Some((is_bottom, view_id)) = border_view(editor, row, column) {
+                    // log::info!("got border");
+                    // if let Some(neighbor_id) = editor.tree.find_container(view_id) {
+                    //     log::info!("Got a neighbor");
+                    // let neighbor_splits = editor
+                    //     .tree
+                    //     .get_n_layouts(neighbor_id, helix_view::tree::Layout::Horizontal);
+                    editor.tree.set_n_layouts();
+                    editor
+                        .tree
+                        .get_mut_container(view_id)
+                        .dothething(is_bottom, view_id);
+                    editor.tree.recalculate(false);
                     return EventResult::Consumed(None);
+                    // } else {
+                    //     log::info!("no neighbor");
+                    // }
                 }
 
                 EventResult::Ignored(None)
@@ -1213,18 +1225,17 @@ impl EditorView {
             MouseEventKind::Drag(MouseButton::Left) => {
                 let (view, doc) = current!(cxt.editor);
 
-                let pos = match view.pos_at_screen_coords(doc, row, column, true) {
-                    Some(pos) => pos,
-                    None => return EventResult::Ignored(None),
+                if let Some(pos) = view.pos_at_screen_coords(doc, row, column, true) {
+                    let mut selection = doc.selection(view.id).clone();
+                    let primary = selection.primary_mut();
+                    *primary = primary.put_cursor(doc.text().slice(..), pos, true);
+                    doc.set_selection(view.id, selection);
+                    let view_id = view.id;
+                    cxt.editor.ensure_cursor_in_view(view_id);
+                    return EventResult::Consumed(None);
                 };
 
-                let mut selection = doc.selection(view.id).clone();
-                let primary = selection.primary_mut();
-                *primary = primary.put_cursor(doc.text().slice(..), pos, true);
-                doc.set_selection(view.id, selection);
-                let view_id = view.id;
-                cxt.editor.ensure_cursor_in_view(view_id);
-                EventResult::Consumed(None)
+                EventResult::Ignored(None)
             }
 
             MouseEventKind::ScrollUp | MouseEventKind::ScrollDown => {

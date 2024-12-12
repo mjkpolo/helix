@@ -515,15 +515,15 @@ impl View {
     ) -> Option<usize> {
         let inner = self.inner_area(doc);
         // 1 for status
-        log::info!(
-            "t: {} b: {} r: {} l: {} row: {}, col: {}",
-            inner.top(),
-            inner.bottom(),
-            inner.right(),
-            inner.left(),
-            row,
-            column,
-        );
+        // log::info!(
+        //     "t: {} b: {} r: {} l: {} row: {}, col: {}",
+        //     inner.top(),
+        //     inner.bottom(),
+        //     inner.right(),
+        //     inner.left(),
+        //     row,
+        //     column,
+        // );
         if row < inner.top() || row >= inner.bottom() {
             return None;
         }
@@ -631,11 +631,17 @@ impl View {
     }
 
     // Only consider bottom or right side. Only needs to match for one view
-    pub fn border_coords_at_screen_coords(&self, row: u16, column: u16) -> Option<()> {
-        if row != self.area.bottom() - 1 && column != self.area.right() {
-            return None;
+    pub fn border_coords_at_screen_coords(&self, row: u16, column: u16) -> Option<bool> {
+        if row == self.area.bottom() - 1
+            && column >= self.area.left()
+            && column <= self.area.right()
+        {
+            return Some(true);
         }
-        Some(())
+        if column == self.area.right() && row >= self.area.top() && row <= self.area.bottom() - 1 {
+            return Some(false);
+        }
+        None
     }
 
     pub fn remove_document(&mut self, doc_id: &DocumentId) {

@@ -15,6 +15,9 @@ pub struct Tree {
 
     // used for traversals
     stack: Vec<(ViewId, Rect)>,
+    // used for layout traversals
+    layout_stack: Vec<ViewId>,
+    reverse_layout_stack: Vec<ViewId>,
 }
 
 #[derive(Debug)]
@@ -65,7 +68,9 @@ pub struct Container {
     layout: Layout,
     children: Vec<ViewId>,
     area: Rect,
-    bounds_deltas: Vec<i16>,
+    bounds: Vec<u16>,
+    vert_layouts: usize,
+    horz_layouts: usize,
 }
 
 impl Container {
@@ -74,15 +79,52 @@ impl Container {
             layout,
             children: Vec::new(),
             area: Rect::default(),
-            bounds_deltas: Vec::new(),
+            bounds: Vec::new(),
+            vert_layouts: 0,
+            horz_layouts: 0,
         }
     }
 
-    pub fn dothething(&mut self, view_id: ViewId) {
-        if let Some(pos) = self.children.iter().position(|child| child == &view_id) {
-            self.bounds_deltas[pos] += 10;
-            log::info!("did the thing");
+    pub fn dothething(&mut self, is_bottom: bool, id: ViewId) {
+        if let Some(pos) = self.children.iter().position(|child| child == &id) {
+            if (self.layout == Layout::Horizontal && is_bottom
+                || self.layout == Layout::Vertical && !is_bottom)
+                && pos != self.children.len() - 1
+            {
+                self.bounds[pos] += 1;
+                // match self.layout {
+                //     Layout::Horizontal => {
+                //         self.bounds[pos] = self.bounds[pos].max(self.area.width);
+                //     }
+                //     Layout::Vertical => {
+                //         self.bounds[pos] = self.bounds[pos].max(self.area.height);
+                //     }
+                // }
+                log::info!(
+                    "did the thing with {}h, {}v splits",
+                    self.horz_layouts,
+                    self.vert_layouts
+                );
+            }
         }
+    }
+
+    pub fn push_child(&mut self, view_id: ViewId) -> &mut Self {
+        self.children.push(view_id);
+        self.bounds.push(0);
+        self
+    }
+
+    pub fn insert_child(&mut self, index: usize, view_id: ViewId) -> &mut Self {
+        self.children.insert(index, view_id);
+        self.bounds.insert(index, 0);
+        self
+    }
+
+    pub fn remove_child(&mut self, index: usize) -> &mut Self {
+        self.children.remove(index);
+        self.bounds.remove(index);
+        self
     }
 }
 
@@ -109,6 +151,8 @@ impl Tree {
             area,
             nodes,
             stack: Vec::new(),
+            layout_stack: Vec::new(),
+            reverse_layout_stack: Vec::new(),
         }
     }
 
@@ -140,13 +184,12 @@ impl Tree {
             pos + 1
         };
 
-        container.children.insert(pos, node);
-        container.bounds_deltas.insert(pos, 0i16);
+        container.insert_child(pos, node);
         // focus the new node
         self.focus = node;
 
         // recalculate all the sizes
-        self.recalculate();
+        self.recalculate(true);
 
         node
     }
@@ -178,8 +221,7 @@ impl Tree {
                     .unwrap();
                 pos + 1
             };
-            container.children.insert(pos, node);
-            container.bounds_deltas.insert(pos, 0);
+            container.insert_child(pos, node);
             self.nodes[node].parent = parent;
         } else {
             let mut split = Node::container(layout);
@@ -193,10 +235,8 @@ impl Tree {
                 } => container,
                 _ => unreachable!(),
             };
-            container.children.push(focus);
-            container.bounds_deltas.push(0);
-            container.children.push(node);
-            container.bounds_deltas.push(0);
+            container.push_child(focus);
+            container.push_child(node);
             self.nodes[focus].parent = split;
             self.nodes[node].parent = split;
 
@@ -222,7 +262,7 @@ impl Tree {
         self.focus = node;
 
         // recalculate all the sizes
-        self.recalculate();
+        self.recalculate(true);
 
         node
     }
@@ -257,8 +297,7 @@ impl Tree {
             // container.bounds_deltas[pos] = 0;
             self.nodes[new].parent = parent;
         } else {
-            container.children.remove(pos);
-            container.bounds_deltas.remove(pos);
+            container.remove_child(pos);
         }
     }
 
@@ -281,7 +320,7 @@ impl Tree {
             self.remove_or_replace(parent, Some(sibling));
         }
 
-        self.recalculate()
+        self.recalculate(true)
     }
 
     pub fn views(&self) -> impl Iterator<Item = (&View, bool)> {
@@ -357,6 +396,17 @@ impl Tree {
             _ => unreachable!(),
         }
     }
+
+    // pub fn get_n_layouts(&mut self, index: ViewId, layout: Layout) -> u16 {
+    //     let node = &self.nodes[index];
+    //     match &node.content {
+    //         Content::View(_view) => 0,
+    //         Content::Container(container) => match layout {
+    //             Layout::Horizontal => container.horz_layouts,
+    //             Layout::Vertical => container.vert_layouts,
+    //         },
+    //     }
+    // }
     /// Check if tree contains a [Node] with a given index.
     pub fn contains(&self, index: ViewId) -> bool {
         self.nodes.contains_key(index)
@@ -375,13 +425,105 @@ impl Tree {
     pub fn resize(&mut self, area: Rect) -> bool {
         if self.area != area {
             self.area = area;
-            self.recalculate();
+            self.recalculate(true);
             return true;
         }
         false
     }
 
-    pub fn recalculate(&mut self) {
+    // pub fn n_layouts(&mut self, view_id: ViewId, layout: Layout) -> u16 {
+    //     let prev = self.prev();
+    //     let pcvl = if self.nodes.contains_key(prev) {
+    //         match &self.nodes[prev].content {
+    //             Content::Container(container) => match layout {
+    //                 Layout::Vertical => container.vert_layouts,
+    //                 Layout::Horizontal => container.horz_layouts,
+    //             },
+    //             _ => 0,
+    //         }
+    //     } else {
+    //         0
+    //     };
+
+    //     pcvl
+    // }
+
+    pub fn set_n_layouts(&mut self) {
+        self.layout_stack.push(self.root);
+        self.reverse_layout_stack.push(self.root);
+
+        while let Some(key) = self.layout_stack.pop() {
+            let node = &mut self.nodes[key];
+            match &mut node.content {
+                Content::View(_view) => {}
+                Content::Container(container) => {
+                    container.vert_layouts = 0;
+                    container.horz_layouts = 0;
+                    for &child in container.children.iter() {
+                        self.layout_stack.push(child);
+                        self.reverse_layout_stack.push(child);
+                    }
+                }
+            }
+        }
+
+        while let Some(key) = self.reverse_layout_stack.pop() {
+            let parent = self.nodes[key].parent;
+            if let Some([parent_node, child_node]) = self.nodes.get_disjoint_mut([parent, key]) {
+                match &child_node.content {
+                    Content::Container(child_container) => {
+                        let mut nvl: usize = child_container.vert_layouts;
+                        let mut nhl: usize = child_container.horz_layouts;
+                        match child_container.layout {
+                            Layout::Vertical => nvl += child_container.children.len(),
+                            Layout::Horizontal => nhl += child_container.children.len(),
+                        }
+                        match &mut parent_node.content {
+                            Content::Container(parent_container) => match parent_container.layout {
+                                Layout::Vertical => {
+                                    parent_container.vert_layouts += nvl;
+                                    parent_container.horz_layouts =
+                                        parent_container.horz_layouts.max(nhl);
+                                }
+                                Layout::Horizontal => {
+                                    parent_container.vert_layouts =
+                                        parent_container.vert_layouts.max(nvl);
+                                    parent_container.horz_layouts += nhl;
+                                }
+                            },
+                            Content::View(_) => {}
+                        }
+                    }
+                    Content::View(_) => {}
+                }
+            } else {
+                let node = &mut self.nodes[key];
+                match &mut node.content {
+                    Content::Container(container) => match container.layout {
+                        Layout::Horizontal => container.horz_layouts += container.children.len(),
+                        Layout::Vertical => container.vert_layouts += container.children.len(),
+                    },
+                    Content::View(_) => {}
+                }
+            }
+        }
+    }
+    // if let Some((nvl, nhl)) = self.layout_counts.get(child) {
+    //     match container.layout {
+    //         Layout::Horizontal => {
+    //             nvls = nvls.max(*nvl);
+    //             nhls = nhls + *nhl;
+    //         }
+    //         Layout::Vertical => {
+    //             nvls = nvls + *nvl;
+    //             nhls = nhls.max(*nhl);
+    //         }
+    //     }
+    // }
+    // container.vert_layouts = nvls;
+    // container.horz_layouts = nhls;
+
+    pub fn recalculate(&mut self, calc_bounds: bool) {
         if self.is_empty() {
             // There are no more views, so the tree should focus itself again.
             self.focus = self.root;
@@ -405,32 +547,33 @@ impl Tree {
                     view.area = area;
                 } // TODO: call f()
                 Content::Container(container) => {
+                    // log::info!(
+                    //     "hl: {} vl: {}",
+                    //     container.horz_layouts,
+                    //     container.vert_layouts
+                    // );
                     // debug!!("setting container area {:?}", area);
                     container.area = area;
 
+                    let len = container.children.len();
+
                     match container.layout {
                         Layout::Horizontal => {
-                            let len = container.children.len();
-
                             let height = area.height / len as u16;
 
                             let mut child_y = area.y;
 
                             for (i, child) in container.children.iter().enumerate() {
-                                let bd = container.bounds_deltas[i];
-                                let child_height = if bd >= 0 {
-                                    height.saturating_add(bd as u16)
-                                } else {
-                                    height.saturating_sub((-bd) as u16)
+                                if calc_bounds {
+                                    container.bounds[i] = height;
                                 }
-                                .min(area.height - 2);
                                 let mut area = Rect::new(
                                     container.area.x,
                                     child_y,
                                     container.area.width,
-                                    child_height,
+                                    container.bounds[i],
                                 );
-                                child_y += child_height;
+                                child_y += container.bounds[i];
 
                                 // last child takes the remaining width because we can get uneven
                                 // space from rounding
@@ -454,20 +597,16 @@ impl Tree {
                             let mut child_x = area.x;
 
                             for (i, child) in container.children.iter().enumerate() {
-                                let bd = container.bounds_deltas[i];
-                                let child_width = if bd >= 0 {
-                                    width.saturating_add(bd as u16)
-                                } else {
-                                    width.saturating_sub((-bd) as u16)
+                                if calc_bounds {
+                                    container.bounds[i] = width;
                                 }
-                                .min(area.width - 2);
                                 let mut area = Rect::new(
                                     child_x,
                                     container.area.y,
-                                    child_width,
+                                    container.bounds[i],
                                     container.area.height,
                                 );
-                                child_x += child_width + inner_gap;
+                                child_x += container.bounds[i] + inner_gap;
 
                                 // last child takes the remaining width because we can get uneven
                                 // space from rounding
@@ -535,6 +674,38 @@ impl Tree {
                 }
             }
         }
+    }
+
+    pub fn find_container(&self, id: ViewId) -> Option<ViewId> {
+        let parent = self.nodes[id].parent;
+        // Base case, we found the root of the tree
+        if parent == id {
+            return None;
+        }
+        // Parent must always be a container
+        let parent_container = match &self.nodes[parent].content {
+            Content::Container(container) => container,
+            Content::View(_) => unreachable!(),
+        };
+        let child_id = match parent_container.layout {
+            // index wise in the child list the Up and Left represents a -1
+            // thus reversed iterator.
+            // Direction::Up | Direction::Left => parent_container
+            //     .children
+            //     .iter()
+            //     .rev()
+            //     .skip_while(|i| **i != id)
+            //     .copied()
+            //     .nth(1)?,
+            // Down and Right => +1 index wise in the child list
+            _ => parent_container
+                .children
+                .iter()
+                .skip_while(|i| **i != id)
+                .copied()
+                .nth(1)?,
+        };
+        Some(child_id)
     }
 
     fn find_child(&self, id: ViewId, children: &[ViewId], direction: Direction) -> Option<ViewId> {
@@ -635,7 +806,7 @@ impl Tree {
                 Layout::Vertical => Layout::Horizontal,
                 Layout::Horizontal => Layout::Vertical,
             };
-            self.recalculate();
+            self.recalculate(false);
         }
     }
 
