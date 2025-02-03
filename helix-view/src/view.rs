@@ -632,13 +632,16 @@ impl View {
 
     // Only consider bottom or right side. Only needs to match for one view
     pub fn border_coords_at_screen_coords(&self, row: u16, column: u16) -> Option<bool> {
-        if row == self.area.bottom() - 1
+        if row == self.area.bottom().saturating_sub(1)
             && column >= self.area.left()
             && column <= self.area.right()
         {
             return Some(true);
         }
-        if column == self.area.right() && row >= self.area.top() && row <= self.area.bottom() - 1 {
+        if column == self.area.left().saturating_sub(1)
+            && row >= self.area.top()
+            && row <= self.area.bottom().saturating_sub(1)
+        {
             return Some(false);
         }
         None

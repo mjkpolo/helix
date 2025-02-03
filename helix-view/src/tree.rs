@@ -85,30 +85,6 @@ impl Container {
         }
     }
 
-    pub fn dothething(&mut self, is_bottom: bool, id: ViewId) {
-        if let Some(pos) = self.children.iter().position(|child| child == &id) {
-            if (self.layout == Layout::Horizontal && is_bottom
-                || self.layout == Layout::Vertical && !is_bottom)
-                && pos != self.children.len() - 1
-            {
-                self.bounds[pos] += 1;
-                // match self.layout {
-                //     Layout::Horizontal => {
-                //         self.bounds[pos] = self.bounds[pos].max(self.area.width);
-                //     }
-                //     Layout::Vertical => {
-                //         self.bounds[pos] = self.bounds[pos].max(self.area.height);
-                //     }
-                // }
-                log::info!(
-                    "did the thing with {}h, {}v splits",
-                    self.horz_layouts,
-                    self.vert_layouts
-                );
-            }
-        }
-    }
-
     pub fn push_child(&mut self, view_id: ViewId) -> &mut Self {
         self.children.push(view_id);
         self.bounds.push(0);
@@ -153,6 +129,49 @@ impl Tree {
             stack: Vec::new(),
             layout_stack: Vec::new(),
             reverse_layout_stack: Vec::new(),
+        }
+    }
+
+    pub fn dothething(&mut self, is_bottom: bool, id: ViewId) {
+        let container = self.get_mut_container(id);
+        if let Some(pos) = container.children.iter().position(|child| child == &id) {
+            match container.layout {
+                Layout::Horizontal => {
+                    log::info!("horz layout");
+                    container.bounds[pos] += 1;
+                }
+                Layout::Vertical => {
+                    log::info!("vert layout");
+                    if !is_bottom && pos > 0 {
+                        container.bounds[pos - 1] += 1;
+                    } else {
+                        log::info!("going to parent");
+                        let parent_view_id = self.get_parent_view_id(id);
+                        let container = self.get_mut_container(parent_view_id);
+                        if let Some(parent_pos) = container
+                            .children
+                            .iter()
+                            .position(|parent| *parent == parent_view_id)
+                        {
+                            container.bounds[parent_pos] += 1;
+                        }
+                    }
+                }
+            }
+            // match container.layout {
+            //     Layout::Horizontal => {
+            //         self.bounds[pos] = self.bounds[pos].max(self.area.width);
+            //     }
+            //     Layout::Vertical => {
+            //         self.bounds[pos] = self.bounds[pos].max(self.area.height);
+            //     }
+            // }
+            let container = self.get_mut_container(id);
+            log::info!(
+                "did the thing with {}h, {}v splits",
+                container.horz_layouts,
+                container.vert_layouts
+            );
         }
     }
 
@@ -381,11 +400,10 @@ impl Tree {
             _ => unreachable!(),
         }
     }
-
-    /// Get a mutable reference to a [Container] by index.
+    /// Get a mutable reference to a [View] by index.
     /// # Panics
     ///
-    /// Panics if `index` is not in self.nodes, or if the node's content is not [Content::Container]. This can be checked with [Self::contains].
+    /// Panics if `index` is not in self.nodes, or if the node's content is not [Content::View]. This can be checked with [Self::contains].
     pub fn get_mut_container(&mut self, index: ViewId) -> &mut Container {
         let parent = self.nodes[index].parent;
         match &mut self.nodes[parent] {
@@ -395,6 +413,11 @@ impl Tree {
             } => container,
             _ => unreachable!(),
         }
+    }
+
+    /// Get a mutable reference to a [Container] by index.
+    pub fn get_parent_view_id(&self, index: ViewId) -> ViewId {
+        self.nodes[index].parent
     }
 
     // pub fn get_n_layouts(&mut self, index: ViewId, layout: Layout) -> u16 {
