@@ -1725,7 +1725,7 @@ Get the `Rect` associated with the currently focused buffer.
         "#
     );
     register_0!(
-        "selected-register!",
+        "selected-register",
         |cx: &mut Context| cx.editor.selected_register.unwrap_or(cx.editor.config().default_yank_register),
         r#"Get currently selected register"#
     );
