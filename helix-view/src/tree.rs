@@ -1,5 +1,6 @@
 use crate::{graphics::Rect, View, ViewId};
 use slotmap::HopSlotMap;
+use std::collections::HashSet;
 
 // the dimensions are recomputed on window resize/tree change.
 //
@@ -362,6 +363,17 @@ impl Tree {
 
         self.stack.push((self.root, self.area));
 
+        // get nodes containing the focus view
+        let mut focus_nodes = HashSet::new();
+        let mut cur = self.focus;
+        loop {
+            focus_nodes.insert(cur);
+            if self.nodes[cur].parent == cur {
+                break;
+            }
+            cur = self.nodes[cur].parent
+        }
+
         // take the area
         // fetch the node
         // a) node is view, give it whole area
@@ -372,22 +384,27 @@ impl Tree {
 
             match &mut node.content {
                 Content::View(view) => {
-                    // debug!!("setting view area {:?}", area);
+                    log::debug!("setting view area {:?}", area);
                     view.area = area;
                 } // TODO: call f()
                 Content::Container(container) => {
-                    // debug!!("setting container area {:?}", area);
+                    log::debug!("setting container area {:?}", area);
                     container.area = area;
 
                     match container.layout {
                         Layout::Horizontal => {
                             let len = container.children.len();
 
-                            let height = area.height / len as u16;
+                            // let height = area.height / len as u16;
 
                             let mut child_y = area.y;
 
                             for (i, child) in container.children.iter().enumerate() {
+                                let height = if focus_nodes.contains(child) {
+                                    area.height - len as u16
+                                } else {
+                                    1 as u16
+                                };
                                 let mut area = Rect::new(
                                     container.area.x,
                                     child_y,
