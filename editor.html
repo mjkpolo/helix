@@ -15,8 +15,8 @@
         <link rel="icon" href="favicon-d5706b94.svg">
         <link rel="shortcut icon" href="favicon-cc1a8b51.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -28,7 +28,7 @@
         <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
-        <link rel="stylesheet" href="custom-5658e571.css">
+        <link rel="stylesheet" href="custom-a1acbc99.css">
 
 
         <!-- Provide site root and default themes to javascript -->
@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "colibri";
             const default_dark_theme = "colibri";
-            window.path_to_searchindex_js = "searchindex-663199a9.js";
+            window.path_to_searchindex_js = "searchindex-1e3bba83.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-fb138b52.js"></script>
+        <script src="toc-c2fa7ea4.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -209,6 +209,7 @@
 <li><a href="#editorsmart-tab-section"><code>[editor.smart-tab]</code> Section</a></li>
 <li><a href="#editorinline-diagnostics-section"><code>[editor.inline-diagnostics]</code> Section</a></li>
 <li><a href="#editorword-completion-section"><code>[editor.word-completion]</code> Section</a></li>
+<li><a href="#editorworkspace-trust-section"><code>[editor.workspace-trust]</code> Section</a></li>
 </ul>
 <h3 id="editor-section"><a class="header" href="#editor-section"><code>[editor]</code> Section</a></h3>
 <div class="table-wrapper">
@@ -650,7 +651,7 @@ wrap-indicator = ""  # set wrap-indicator to "" to hide it
 </table>
 </div>
 <p>Due to lack of support for S-tab in some terminals, the default keybindings don’t fully embrace smart-tab editing experience. If you enjoy smart-tab navigation and a terminal that supports the <a href="https://github.com/helix-editor/helix/wiki/Terminal-Support#enhanced-keyboard-protocol">Enhanced Keyboard protocol</a>, consider setting extra keybindings:</p>
-<pre><code>[keys.normal]
+<pre><code class="language-toml">[keys.normal]
 tab = "move_parent_node_end"
 S-tab = "move_parent_node_start"
 
@@ -663,7 +664,7 @@ S-tab = "extend_parent_node_start"
 </code></pre>
 <h3 id="editorinline-diagnostics-section"><a class="header" href="#editorinline-diagnostics-section"><code>[editor.inline-diagnostics]</code> Section</a></h3>
 <p>Options for rendering diagnostics inside the text like shown below</p>
-<pre><code>fn main() {
+<pre><code class="language-text">fn main() {
   let foo = bar;
             └─ no such value in this scope
 }
@@ -684,7 +685,7 @@ S-tab = "extend_parent_node_start"
 </div>
 <p>The allowed values for <code>cursor-line</code> and <code>other-lines</code> are: <code>error</code>, <code>warning</code>, <code>info</code>, <code>hint</code>.</p>
 <p>The (first) diagnostic with the highest severity that is not shown inline is rendered at the end of the line (as long as its severity is higher than the <code>end-of-line-diagnostics</code> config option):</p>
-<pre><code>fn main() {
+<pre><code class="language-text">fn main() {
   let baz = 1;
   let foo = bar; a local variable with a similar name exists: baz
             └─ no such value in this scope
@@ -708,6 +709,36 @@ S-tab = "extend_parent_node_start"
 enable = true
 # Set the trigger length lower so that words are completed more often
 trigger-length = 4
+</code></pre>
+<h3 id="editorworkspace-trust-section"><a class="header" href="#editorworkspace-trust-section"><code>[editor.workspace-trust]</code> Section</a></h3>
+<p>Controls implicit workspace trust. See the <a href="./workspace-trust.html">workspace
+trust</a> chapter for the full feature.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Key</th><th>Description</th><th>Default</th></tr>
+</thead>
+<tbody>
+<tr><td><code>level</code></td><td>The default level of trust for every workspace.</td><td><code>"servers"</code></td></tr>
+<tr><td><code>prompt</code></td><td>Whether to show a modal when opening a file in an untrusted workspace.</td><td><code>true</code></td></tr>
+<tr><td><code>trusted</code></td><td>Glob patterns whose matching workspaces are trusted without a grant.</td><td><code>[]</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Example:</p>
+<pre><code class="language-toml">[editor.workspace-trust]
+# Even if `false`, the statusline `[⚠]` indicator is still shown.
+prompt = false
+
+# "none":     prompt for every workspace.
+# "servers":  trust LSP and DAP launches but still gate local config and git;
+#             .helix/config.toml, .helix/languages.toml, etc. need :workspace-trust.
+# "insecure": trust everything (discouraged).
+level = "servers"
+
+# Discouraged: skips .helix/ change detection and trusts anything that lands
+# under a matching path. `~` and environment variables are expanded.
+trusted = ["~/src/github.com/me/*"]
 </code></pre>
 <hr>
 <ol class="footnote-definition">
@@ -766,13 +797,15 @@ trigger-length = 4
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
 
         <!-- Custom JS scripts -->
+        <script src="ts-query-56018970.js"></script>
+
+        <script src="book-c22b7243.js"></script>
 
 
 
